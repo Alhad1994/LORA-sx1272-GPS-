@@ -1,0 +1,228 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1671\cocoasubrtf200
+{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\paperw11900\paperh16840\margl1440\margr1440\vieww10800\viewh8400\viewkind0
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 // Include the SX1272 and SPI library: \
+#include "SX1272.h"\
+#include <SPI.h>\
+#include "TinyGPS.h"\
+#include <TheThingsNetwork.h>\
+#include "SoftwareSerial.h"\
+#include <stdlib.h>\
+#include <string.h>\
+\
+bool OTAA = false; // use ABP\
+// USE YOUR OWN KEYS!\
+const byte devAddr[4] =\
+\{ 0x26, 0x04, 0x1F, 0xBA \};\
+\
+// USE YOUR OWN KEYS!\
+const byte appSKey[16] =\
+\{ 0x21, 0x0B, 0x49, 0x26, 0x35, 0x51, 0x15, 0xAF, 0x56, 0x7B, 0xBF, 0x7F, 0x81, 0x30, 0x93, 0x30 \};\
+\
+// USE YOUR OWN KEYS!\
+const byte nwkSKey[16] =\
+\{ 0xF3, 0x3E, 0x46, 0x69, 0x86, 0xDB, 0x81, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7B, 0x0F, 0xC7, 0xBF \};\
+\
+//----- End ABP -----\
+\
+int  ttn();\
+ \
+// define the destination address to send packets\
+uint8_t rx_address = 1;\
+int payload;\
+int e;\
+ long lati,lon;\
+  double templat=0,templon=0;\
+int recp = 8;\
+int trans = 9;\
+int counter = 0;\
+\
+char message1 [60];\
+\
+SoftwareSerial gpsSerial(8, 9);  //RX=pin 8, TX=pin 9// blue to TX ,orange to RX....\
+TinyGPS gps;//This is the GPS object that will pretty much do all the grunt work with the NMEA data\
+\
+\
+\
+void setup(void)\
+\{\
+  Serial.begin(38400); // connect serial  //for some olther gps sensor try Serial.begin(9600); and gpsSerial.begin(4800);\
+    gpsSerial.begin(9600); \
+       Serial.println("GPS start");\
+       Serial.println("initializing satellite's reading");\
+\
+       pinMode(recp, INPUT);\
+       pinMode(trans, OUTPUT);\
+\
+\
+  // Power ON the module\
+  sx1272.ON();\
+\
+ // Select implicit (off) or explicit (on) header mode\
+  e = sx1272.setHeaderON();\
+  Serial.print(F("Setting Header ON.\\t\\t state "));  \
+  Serial.println(e);\
+  \
+  // Set transmission mode and print the result\
+  e = sx1272.setMode(1);\
+  Serial.println(F("Setting Mode '1'.\\t\\t state "));\
+  Serial.println(e, DEC);\
+  \
+  // Select frequency channel\
+  e = sx1272.setChannel(CH_10_868);\
+  Serial.println(F("Setting Channel CH_10_868.\\t state "));\
+  Serial.println(e, DEC);\
+  \
+  // enable carrier sense\
+  sx1272._enableCarrierSense=true;\
+  \
+  // Select output power (Max, High or Low)\
+  e = sx1272.setPower('H');\
+  Serial.println(F("Setting Power to 'H'.\\t\\t state "));\
+  Serial.println(e, DEC);\
+  \
+  // Set the node address and print the result\
+  e = sx1272.setNodeAddress(2);\
+  Serial.println(F("Setting Mode '2'.\\t\\t state "));\
+  Serial.println(e, DEC);\
+\
+  // Select CRC on or off\
+  e = sx1272.setCRC_ON();\
+  Serial.print(F("Setting CRC ON.\\t\\t\\t state "));\
+  Serial.println(e);  \
+  \
+  // Print a success message\
+  Serial.println(F("SX1272 successfully configured"));\
+   delay(500);\
+\
+ttn.personalize(devAddr, nwkSKey, appSKey);\
+ttn.showStatus();\
+    \
+\}\
+\
+char* lltoa(long val, int base)\{\
+\
+    static char buf[64] = \{0\};\
+\
+    int i = 62;\
+    int sign = (val < 0);\
+    if(sign) val = -val;\
+\
+    if(val == 0) return "0";\
+\
+    for(; val && i ; --i, val /= base) \{\
+        buf[i] = "0123456789abcdef"[val % base];\
+    \}\
+\
+    if(sign) \{\
+        buf[i--] = '-';\
+    \}\
+    return &buf[i+1];\
+\
+\}\
+ \
+void loop()\
+\{\
+  int val;\
+ \
+\
+  e = digitalRead(recp);\
+  digitalWrite(val,e);\
+  get_reading();\
+ sprintf(message1,"lon value: %i \\r\\nlat value: %i \\r\\n",templon,templat);\
+  val = sx1272.sendPacketTimeout(rx_address, message1); \
+  Serial.println(message1);\
+  Serial.print(F("Packet sent, state "));\
+  Serial.println(e, DEC);\
+  counter++; \
+  Serial.println(counter);\
+  delay(100);  \
+\
+\}\
+\
+\
+void get_reading()\{\
+   while(gpsSerial.available())\{ // check for gps data\
+       if(gps.encode(gpsSerial.read()))\{ // encode gps data\
+        gps.get_position(&lati,&lon); // get latitude and longitude\
+        // display position\
+        Serial.print("coordinates ");Serial.print(lati/1000000); Serial.print(".");Serial.print(lati%1000000);Serial.print(" ");// print latitude to serialmonitor\
+        Serial.print(", ");Serial.print(lon/1000000); Serial.print(".");Serial.println(lon/1000000);// print longitude to serialmonitor\
+\
+        \
+       ttn.sendBytes(payload, sizeof(payload));\
+       delay(15000);\
+       \
+        long latione = lati/1000000;\
+        long latitwo = lati%1000000;\
+        long lonone = lon/1000000;          \
+        long lontwo = lon%1000000;\
+\
+        //ltoa(latione,convertedstring1,10);\
+        //ltoa(latitwo,convertedstring2,10);\
+        \
+        String stringlati = (String)latione + '.' + (String)latitwo;\
+        Serial.println(stringlati);\
+        \
+      \
+        int nDigits = 0;\
+        long tempDigits = latitwo;\
+        \
+      //for calculating no. of digits in latitwo\
+        while(tempDigits>0)     \
+        \{\
+          tempDigits  /=10;\
+          nDigits++;\
+        \}\
+\
+        double tempdiv = 10;\
+        \
+        //for creating division value\
+        while(nDigits>1)\{\
+          tempdiv *= 10; \
+          --nDigits;\
+        \}\
+        \
+        //double templatitwo =latitwo/tempdiv;\
+       \
+        templat = latione + latitwo/tempdiv;\
+        Serial.print(" templati = "); Serial.println(templat); \
+        \
+        \
+        nDigits = 0;\
+        tempDigits = lontwo;\
+        \
+      //for calculating no. of digits in latitwo\
+        while(tempDigits>0)     \
+        \{\
+          tempDigits  /=10;\
+          nDigits++;\
+        \}\
+\
+        tempdiv = 10;\
+        \
+        //for creating division value\
+        while(nDigits>1)\{\
+          tempdiv *= 10; \
+          --nDigits;\
+        \}\
+\
+        Serial.print(" lon one = ");Serial.print(lonone);\
+        Serial.print(" lon two = ");Serial.print(lontwo);\
+        Serial.print(" tempdiv = ");Serial.print(tempdiv);\
+        //double templontwo =lontwo/tempdiv;\
+        \
+        Serial.print("templontwo = ");Serial.println(lontwo/tempdiv);\
+        \
+        templon = lonone + lontwo/tempdiv;\
+        Serial.print("templon = ");Serial.println(templon);\
+        \
+        \
+\}\
+   \}\
+\}\
+}
